@@ -1,0 +1,60 @@
+/* Linux test frontend: runs the game headless, dumps frames as PPM, scripted touches. */
+#include "plat.h"
+#include <time.h>
+#include "input.h"
+#include "buttons.h"
+#include <sys/stat.h>
+
+static long frames, max_frames = 300, dump_every = 100;
+static uint64_t vtime = 1000000;
+static const char *outdir = "/tmp/atframes";
+static char touchscript[1024];
+
+void plat_sleep_ms(int ms) { vtime += ms; }
+uint64_t plat_ms(void) { return vtime; }
+const char *plat_data_dir(void) { return "/tmp/atdata/"; }
+void plat_quit(int code) { fprintf(stderr, "[plat] quit(%d) after %ld frames\n", code, frames); exit(code); }
+
+static void dump(const uint32_t *px, int w, int h, const char *name) {
+    char p[256]; snprintf(p, sizeof p, "%s/%s.ppm", outdir, name);
+    FILE *f = fopen(p, "wb"); if (!f) return;
+    fprintf(f, "P6\n%d %d\n255\n", w, h);
+    for (int i = 0; i < w * h; i++) { uint8_t c[3] = {px[i] >> 16, px[i] >> 8, px[i]}; fwrite(c, 1, 3, f); }
+    fclose(f);
+}
+void plat_present(const uint32_t *px, int w, int h) {
+    frames++;
+    if (dump_every && frames % dump_every == 0) { char n[32]; snprintf(n, sizeof n, "f%05ld", frames); dump(px, w, h, n); }
+    if (frames >= max_frames) { dump(px, w, h, "final"); { FILE *f = fopen("/proc/self/status", "r"); char l[256]; while (f && fgets(l, sizeof l, f)) if (!strncmp(l, "VmHWM", 5) || !strncmp(l, "VmRSS", 5)) fprintf(stderr, "[mem] %s", l); if (f) fclose(f); } fprintf(stderr, "[plat] reached %ld frames\n", frames); exit(0); }
+}
+static char padscript[1024];
+void plat_poll(void) {
+    /* touch script: "frame:x:y;..." -> tap held for 3 frames; pad script: "f0-f1:dx:dy:act;..." */
+    const char *s = touchscript; int k = 0;
+    while (*s) {
+        long f; float x, y; int used = 0;
+        if (sscanf(s, "%ld:%f:%f%n", &f, &x, &y, &used) < 3) break;
+        if (frames >= f && frames < f + 3) input_set(50 + k, 1, x, y); else if (frames == f + 3) input_set(50 + k, 0, x, y);
+        s += used; while (*s == ';') s++; k++;
+    }
+    float dx = 0, dy = 0; int act = 0; s = padscript;
+    while (*s) {
+        long a, b; float x, y; int ac = 0, used = 0;
+        if (sscanf(s, "%ld-%ld:%f:%f:%d%n", &a, &b, &x, &y, &ac, &used) < 5) break;
+        if (frames >= a && frames <= b) { dx = x; dy = y; act = ac; }
+        s += used; while (*s == ';') s++;
+    }
+    buttons_update(dx, dy, act, 0, 0, 0);
+    input_flush();
+}
+int droid_boot(const char *apk, const char *main_class);
+int main(int argc, char **argv) {
+    if (argc < 2) { fprintf(stderr, "usage: %s game.apk [frames] [dump_every] [touchscript]\n", argv[0]); return 1; }
+    if (argc > 2) max_frames = atol(argv[2]);
+    if (argc > 3) dump_every = atol(argv[3]);
+    if (argc > 4) snprintf(touchscript, sizeof touchscript, "%s", argv[4]);
+    if (argc > 5) snprintf(padscript, sizeof padscript, "%s", argv[5]);
+    if (getenv("AVM_LOG")) plat_log = 1;
+    mkdir(outdir, 0755); mkdir("/tmp/atdata", 0755);
+    return droid_boot(argv[1], "Lcom/globalfun/adventuretime/free/Main;");
+}
