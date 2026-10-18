@@ -65,17 +65,22 @@ Sound effects: the 7 effects were converted from the APK's OGG/MP3 files to WAV 
 the build puts them inside the VPK (they are read from `app0:audio/`). Nothing to copy by hand.
 `tools/extract_audio.py` (needs ffmpeg) regenerates them from a different APK version if you ever need to.
 
-**Keep your GitHub repository private**: `audio/` contains the game's sound effects, which you may keep for
-your own use but shouldn't publish.
-
 Note: the game itself targets about 14 logic frames per second (it sleeps 70 ms per frame), so motion will
 look like the original phone version, not 60 fps.
 
-## Launcher icon
+## Icon and LiveArea artwork
 
-The VPK is built **without** an icon on purpose: an `icon0.png` I generated made the Vita installer fail with
-error 0x8010113D (removing it fixed the install). If you want an icon, add a 128x128 PNG exported by an
-image editor as `sce_sys/icon0.png` and put `FILE sce_sys/icon0.png sce_sys/icon0.png` back in `CMakeLists.txt`.
+`sce_sys/` holds the bubble icon (`icon0.png`, 128x128) and LiveArea background / start image (840x500 and
+280x158, all 8-bit indexed PNGs) made from the title art and the Finn icon. An earlier icon I generated made one
+Vita refuse the install (error 0x8010113D), so the GitHub build produces **two** VPKs:
+
+* `AdventureTimeVita-with-artwork`: try this one first;
+* `AdventureTimeVita-no-artwork`: identical game, no icon/LiveArea assets; install it if the first one fails.
+
+Locally: `cmake -DWITH_ARTWORK=OFF ..` builds the plain version.
+
+**Keep your GitHub repository private**: `audio/` and `sce_sys/` contain Cartoon Network / game assets you may
+keep for your own use but shouldn't publish.
 
 ## When something goes wrong
 

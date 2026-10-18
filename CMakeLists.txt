@@ -25,6 +25,17 @@ target_link_libraries(${PROJECT_NAME}
   SceDisplay_stub SceCtrl_stub SceTouch_stub ScePower_stub SceAudio_stub
 )
 
+# bubble icon + LiveArea artwork (turn off with -DWITH_ARTWORK=OFF if your Vita rejects the install)
+option(WITH_ARTWORK "Bundle bubble icon and LiveArea artwork" ON)
+set(ART_PAIRS "")
+if(WITH_ARTWORK)
+  set(ART_PAIRS
+    sce_sys/icon0.png sce_sys/icon0.png
+    sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+    sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+    sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png)
+endif()
+
 # bundle the sound effects (audio/*.wav) inside the VPK; the app reads them from app0:audio/
 file(GLOB AUDIO_FILES RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/audio/*.wav)
 set(AUDIO_PAIRS "")
@@ -36,5 +47,5 @@ vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   VERSION ${VITA_VERSION}
   NAME ${VITA_APP_NAME}
-  FILE ${AUDIO_PAIRS}
+  FILE ${ART_PAIRS} ${AUDIO_PAIRS}
 )
