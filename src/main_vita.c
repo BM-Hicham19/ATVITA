@@ -3,6 +3,7 @@
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
 #include <psp2/power.h>
+#include <psp2/audioout.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/kernel/processmgr.h>
@@ -13,6 +14,7 @@
 #include "plat.h"
 #include "input.h"
 #include "buttons.h"
+#include "audio.h"
 
 #define DATA_DIR  "ux0:data/AdventureTimeVita/"
 #define APK_PATH  DATA_DIR "game.apk"
@@ -82,6 +84,17 @@ void plat_poll(void) {
     input_flush();
 }
 
+static int audio_thread(SceSize args, void *argp) {
+    (void)args; (void)argp;
+    int port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, 1024, AUDIO_RATE, SCE_AUDIO_OUT_MODE_STEREO);
+    if (port < 0) { fprintf(stderr, "[vita] audio port open failed: 0x%08x\n", port); fflush(stderr); return port; }
+    int vol[2] = {SCE_AUDIO_OUT_MAX_VOL, SCE_AUDIO_OUT_MAX_VOL};
+    sceAudioOutSetVolume(port, (SceAudioOutChannelFlag)(SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH), vol);
+    static int16_t buf[1024 * 2];
+    for (;;) { audio_render(buf, 1024); sceAudioOutOutput(port, buf); }      /* blocks until the buffer has played */
+    return 0;
+}
+
 int droid_boot(const char *apk, const char *main_class);
 static int game_thread(SceSize args, void *argp) {
     (void)args; (void)argp;
@@ -105,6 +118,8 @@ int main(int argc, char *argv[]) {
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
     (void)quit_combo;
+    SceUID at = sceKernelCreateThread("audio", audio_thread, 0x40, 0x10000, 0, 0, NULL);
+    sceKernelStartThread(at, 0, NULL);
     SceUID th = sceKernelCreateThread("avm", game_thread, 0x40, 2 * 1024 * 1024, 0, 0, NULL);
     sceKernelStartThread(th, 0, NULL);
     int st; sceKernelWaitThreadEnd(th, &st, NULL);

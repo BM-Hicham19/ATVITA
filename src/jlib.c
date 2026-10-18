@@ -19,7 +19,8 @@ NATIVE(n_thr_init0) { (void)args; (void)ret; }
 NATIVE(n_thr_init1) { Obj *t = args[0].o, *m = args[1].o; if (m && !t->data) t->data = vm_string_to_utf8(m); }
 NATIVE(n_thr_print) { Obj *t = args[0].o; (void)ret; fprintf(stderr, "[java] %s: %s\n", t->cls->name, t->data ? (char *)t->data : ""); }
 
-NATIVE(n_thread_sleep) { (void)ret; app_frame_hook(0); int64_t ms = args[0].j; if (ms > 0) plat_sleep_ms((int)ms); }
+NATIVE(n_thread_sleep) { (void)ret; app_frame_hook(0); int64_t ms = args[0].j; if (ms > 10000) ms = 10000; if (ms > 0) plat_sleep_ms((int)ms); }
+NATIVE(n_thread_yield) { (void)args; (void)ret; app_frame_hook(0); }
 NATIVE(n_thread_start) { (void)ret; app_thread_start(args[0].o); }
 
 NATIVE(n_sys_time) { (void)args; RETJ((int64_t)plat_ms()); }
@@ -259,7 +260,7 @@ static const NativeClassDef jclasses[] = {
 static const NativeDef jnatives[] = {
     {"Ljava/lang/Object;.<init>()V", n_nop},
     {"Ljava/lang/Thread;.<init>()V", n_nop}, {"Ljava/lang/Thread;.sleep(J)V", n_thread_sleep}, {"Ljava/lang/Thread;.start()V", n_thread_start},
-    {"Ljava/lang/Thread;.yield()V", n_thread_sleep}, {"Ljava/lang/Thread;.run()V", n_nop},
+    {"Ljava/lang/Thread;.yield()V", n_thread_yield}, {"Ljava/lang/Thread;.run()V", n_nop},
     {"Ljava/lang/Throwable;.<init>()V", n_thr_init0}, {"Ljava/lang/Throwable;.<init>(Ljava/lang/String;)V", n_thr_init1},
     {"Ljava/lang/Throwable;.printStackTrace()V", n_thr_print},
     {"Ljava/lang/System;.currentTimeMillis()J", n_sys_time}, {"Ljava/lang/System;.exit(I)V", n_sys_exit}, {"Ljava/lang/System;.gc()V", n_nop},

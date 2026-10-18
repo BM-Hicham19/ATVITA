@@ -18,8 +18,12 @@ About 0.8 ms/frame on a desktop CPU; peak memory ~55 MB.
 syntax-checked against stand-in headers, so expect to fix small SDK-signature mistakes on first build.
 Vita performance is an estimate (the Cortex-A9 should manage 30 fps, but I haven't seen it).
 
-**Not implemented:** audio (no MP3/OGG/MIDI playback; `MediaPlayer` calls are accepted and ignored),
-`Canvas.drawText` (the game draws its text with its own bitmap fonts, so this should rarely matter),
+**Audio:** music (the game's 8 MIDI tracks) is played by a small built-in synthesizer, so it sounds chiptune-like
+rather than like a real soundfont. Sound effects (OGG/MP3) need the one-time conversion step below. Verified on
+the PC by capturing the audio: the right MIDI notes at the right times, sample-exact effect playback, correct
+restart/overlap/stop behaviour. **Not verified by ear or on Vita hardware.**
+
+**Not implemented:** `Canvas.drawText` (the game draws its text with its own bitmap fonts, so this should rarely matter),
 ads / analytics / "More Games" / "Invite" (switched off on purpose).
 
 ## Build without installing anything (GitHub Actions)
@@ -53,6 +57,26 @@ Install the VPK with VitaShell, then copy your APK to the Vita as
 | Front touch screen        | works as on the phone (menus, etc.)    |
 
 Button positions are in `src/buttons.c` if you want to move them.
+
+## Sound effects (one-time PC step)
+
+The Vita has no built-in OGG/MP3 decoder available to this app, so convert the effects once on your PC
+(needs Python 3 and [ffmpeg](https://ffmpeg.org)):
+
+    python3 tools/extract_audio.py 09617-adventuretime-v1_0_8.apk audio
+
+then copy the resulting `audio` folder to `ux0:data/AdventureTimeVita/audio/` (so it contains
+`sfx_hit.wav`, `sfx_hammer.wav`, ...). Without it the game runs with music but no effects, and
+`log.txt` lists each missing file. The music needs no conversion.
+
+Note: the game itself targets about 14 logic frames per second (it sleeps 70 ms per frame), so motion will
+look like the original phone version, not 60 fps.
+
+## Launcher icon
+
+The VPK is built **without** an icon on purpose: an `icon0.png` I generated made the Vita installer fail with
+error 0x8010113D (removing it fixed the install). If you want an icon, add a 128x128 PNG exported by an
+image editor as `sce_sys/icon0.png` and put `FILE sce_sys/icon0.png sce_sys/icon0.png` back in `CMakeLists.txt`.
 
 ## When something goes wrong
 

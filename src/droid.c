@@ -1,6 +1,7 @@
 /* android.* natives: activity glue, software canvas, input */
 #include "plat.h"
 #include "res.h"
+#include "audio.h"
 #include <math.h>
 
 static Class *C(const char *n) { return vm_class(n); }
@@ -369,10 +370,39 @@ NATIVE(n_assets_open) {
 NATIVE(n_post) { if (nhq < 64 && args[1].o) hq[nhq++] = args[1].o; RETI(1); }
 NATIVE(n_runOnUi) { (void)ret; if (nhq < 64 && args[1].o) hq[nhq++] = args[1].o; }
 NATIVE(n_log_d) { if (plat_log) { char *a = vm_string_to_utf8(args[0].o), *b = vm_string_to_utf8(args[1].o); fprintf(stderr, "[log] %s: %s\n", a, b); free(a); free(b); } RETI(0); }
-NATIVE(n_mp_create) { Obj *o = vm_new_obj(C("Landroid/media/MediaPlayer;")); SETI_(o->f[0], args[1].i); RETO(o); }
-NATIVE(n_mp_start) { (void)ret; SETI_(args[0].o->f[1], 1); }
-NATIVE(n_mp_stop) { (void)ret; SETI_(args[0].o->f[1], 0); }
-NATIVE(n_mp_isPlaying) { RETI(args[0].o->f[1].i); }
+/* ---- MediaPlayer -> audio engine ---- */
+typedef struct { Asset *a; AudioHandle h; int loop; float vol; uint32_t seek_ms; uint32_t res; } MP;
+static struct { char *path; Asset *a; } acache[48]; static int nacache;
+static char *slurp(const char *path, size_t *n) {
+    FILE *f = fopen(path, "rb"); if (!f) return NULL;
+    fseek(f, 0, SEEK_END); long l = ftell(f); fseek(f, 0, SEEK_SET); char *b = malloc(l + 1);
+    if (fread(b, 1, l, f) != (size_t)l) { free(b); fclose(f); return NULL; }
+    fclose(f); *n = l; return b;
+}
+static Asset *load_asset(uint32_t resid) {
+    const char *path = arsc_get(resid); if (!path) return NULL;
+    for (int i = 0; i < nacache; i++) if (!strcmp(acache[i].path, path)) return acache[i].a;
+    Asset *a = NULL; size_t n; const char *dot = strrchr(path, '.'), *sl = strrchr(path, '/'); const char *base = sl ? sl + 1 : path;
+    if (dot && !strcmp(dot, ".mid")) { uint8_t *b = zip_extract(path, &n); if (b) { a = audio_load_midi(b, n); free(b); } }
+    else {
+        char p[600]; int bl = (int)(dot ? dot - base : strlen(base)); snprintf(p, sizeof p, "%saudio/%.*s.wav", plat_data_dir(), bl, base);
+        char *b = slurp(p, &n); if (b) { a = audio_load_wav((uint8_t *)b, n); free(b); }
+        if (!a) fprintf(stderr, "[audio] no sound for %s (expected %s - run tools/extract_audio.py)\n", path, p);
+    }
+    if (nacache < 48) { acache[nacache].path = strdup(path); acache[nacache].a = a; nacache++; }
+    return a;
+}
+NATIVE(n_mp_create) {
+    Obj *o = vm_new_obj(C("Landroid/media/MediaPlayer;")); MP *m = calloc(1, sizeof *m);
+    m->res = args[1].u; m->a = load_asset(args[1].u); audio_handle_init(&m->h); m->vol = 1.0f; o->data = m; RETO(o);
+}
+static MP *mp_of(Obj *o) { return (MP *)o->data; }
+NATIVE(n_mp_start) { (void)ret; MP *m = mp_of(args[0].o); if (m && getenv("AVM_AUDIODBG")) fprintf(stderr, "[audio] start %s loop=%d%s\n", arsc_get(m->res), m->loop, m->a ? "" : " (NO DATA)"); if (m && m->a) audio_play(&m->h, m->a, m->loop, m->vol, m->seek_ms); }
+NATIVE(n_mp_stop) { (void)ret; MP *m = mp_of(args[0].o); if (m) audio_stop(&m->h); }
+NATIVE(n_mp_isPlaying) { MP *m = mp_of(args[0].o); RETI(m && audio_is_playing(&m->h)); }
+NATIVE(n_mp_seekTo) { (void)ret; MP *m = mp_of(args[0].o); if (m) m->seek_ms = args[1].i < 0 ? 0 : (uint32_t)args[1].i; }
+NATIVE(n_mp_setLooping) { (void)ret; MP *m = mp_of(args[0].o); if (m) m->loop = args[1].i != 0; }
+NATIVE(n_mp_setVolume) { (void)ret; MP *m = mp_of(args[0].o); if (!m) return; float v = args[1].f; if (!(v >= 0)) v = 0; if (v > 1) v = 1; m->vol = v; audio_set_volume(&m->h, v); }
 NATIVE(n_uri_parse) { (void)args; RETO(vm_new_obj(C("Landroid/net/Uri;"))); }
 NATIVE(n_intent_chooser) { RETO(args[0].o); }
 NATIVE(n_cb_shared) { (void)args; static Obj *s; RETO(singleton("Lcom/chartboost/sdk/Chartboost;", &s)); }
@@ -426,7 +456,6 @@ static const NativeClassDef dclasses[] = {
     {"Landroid/view/SurfaceView;", NULL, "holder key touch"}, {"Landroid/view/SurfaceHolder;", NULL, "cb"},
     {"Landroid/view/MotionEvent;", NULL, "action aidx count x0 y0 x1 y1 x2 y2 x3 y3 x4 y4 x5 y5"},
     {"Landroid/view/KeyEvent;", NULL, "action code"}, {"Landroid/content/pm/PackageInfo;", NULL, "versionName versionCode"},
-    {"Landroid/media/MediaPlayer;", NULL, "res playing"},
     {NULL, NULL, NULL}};
 static const NativeDef dnatives[] = {
     SIG("Landroid/app/Activity;.<init>()V", n_nop), SIG("Landroid/app/Activity;.getResources()Landroid/content/res/Resources;", n_act_getRes),
@@ -495,7 +524,7 @@ static const NativeDef dnatives[] = {
     SIG("Landroid/graphics/drawable/Drawable;.draw(Landroid/graphics/Canvas;)V", n_nop), SIG("Landroid/graphics/drawable/Drawable;.getIntrinsicHeight()I", n_ret0),
     SIG("Landroid/graphics/drawable/Drawable;.getIntrinsicWidth()I", n_ret0), SIG("Landroid/graphics/drawable/Drawable;.setBounds(IIII)V", n_nop),
     SIG("Landroid/media/MediaPlayer;.create(Landroid/content/Context;I)Landroid/media/MediaPlayer;", n_mp_create), SIG("Landroid/media/MediaPlayer;.isPlaying()Z", n_mp_isPlaying),
-    SIG("Landroid/media/MediaPlayer;.seekTo(I)V", n_nop), SIG("Landroid/media/MediaPlayer;.setLooping(Z)V", n_nop), SIG("Landroid/media/MediaPlayer;.setVolume(FF)V", n_nop),
+    SIG("Landroid/media/MediaPlayer;.seekTo(I)V", n_mp_seekTo), SIG("Landroid/media/MediaPlayer;.setLooping(Z)V", n_mp_setLooping), SIG("Landroid/media/MediaPlayer;.setVolume(FF)V", n_mp_setVolume),
     SIG("Landroid/media/MediaPlayer;.start()V", n_mp_start), SIG("Landroid/media/MediaPlayer;.stop()V", n_mp_stop),
     SIG("Landroid/net/Uri;.parse(Ljava/lang/String;)Landroid/net/Uri;", n_uri_parse),
     SIG("Landroid/os/Handler;.<init>()V", n_nop), SIG("Landroid/os/Handler;.post(Ljava/lang/Runnable;)Z", n_post), SIG("Landroid/os/Vibrator;.vibrate(J)V", n_nop),

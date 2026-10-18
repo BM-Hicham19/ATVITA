@@ -83,6 +83,7 @@ int  vm_is_instance(Obj *o, Class *c);
 void vm_add_root(Obj **slot);
 void vm_throw(const char *clsdesc, const char *msg);
 void vm_gc(void);
+void vm_dump_stack(void);
 void vm_note_alloc(size_t n);   /* natives report big malloc'd payloads so the GC paces itself */
 #define ARR_I(o)  ((int32_t*)(o)->data)
 #define ARR_B(o)  ((int8_t*)(o)->data)

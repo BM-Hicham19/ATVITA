@@ -813,3 +813,12 @@ int vm_load_dex(const uint8_t *dex, size_t len) {
     fres = calloc(n_field, sizeof(FRef)); g_interned = calloc(n_str, sizeof(Obj *));
     return 0;
 }
+
+void vm_dump_stack(void) { for (int i = cdepth - 1; i >= 0 && i > cdepth - 6; i--) fprintf(stderr, "    at %s\n", cstack[i < 256 ? i : 255]->sig); }
+void vm_debug_fields(const char *cls) {
+    Class *c = vm_class(cls);
+    for (Class *k = c; k; k = k->super) {
+        printf("class %s ninst=%d nif=%d is_native=%d\n", k->name, k->ninst, k->nif, k->is_native);
+        for (int i = 0; i < k->nif; i++) printf("   slot %d  %s : %s\n", k->ifields[i].slot, dstr(k->ifields[i].name_idx), type_name(k->ifields[i].type_idx));
+    }
+}
