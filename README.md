@@ -19,7 +19,7 @@ syntax-checked against stand-in headers, so expect to fix small SDK-signature mi
 Vita performance is an estimate (the Cortex-A9 should manage 30 fps, but I haven't seen it).
 
 **Audio:** music (the game's 8 MIDI tracks) is played by a small built-in synthesizer, so it sounds chiptune-like
-rather than like a real soundfont. Sound effects (OGG/MP3) need the one-time conversion step below. Verified on
+rather than like a real soundfont. Sound effects are bundled as WAV. Verified on
 the PC by capturing the audio: the right MIDI notes at the right times, sample-exact effect playback, correct
 restart/overlap/stop behaviour. **Not verified by ear or on Vita hardware.**
 
@@ -58,16 +58,15 @@ Install the VPK with VitaShell, then copy your APK to the Vita as
 
 Button positions are in `src/buttons.c` if you want to move them.
 
-## Sound effects (one-time PC step)
+## Sound
 
-The Vita has no built-in OGG/MP3 decoder available to this app, so convert the effects once on your PC
-(needs Python 3 and [ffmpeg](https://ffmpeg.org)):
+Music: the game's 8 MIDI tracks are played by the built-in synthesizer (read straight from your APK).
+Sound effects: the 7 effects were converted from the APK's OGG/MP3 files to WAV and are bundled in `audio/`;
+the build puts them inside the VPK (they are read from `app0:audio/`). Nothing to copy by hand.
+`tools/extract_audio.py` (needs ffmpeg) regenerates them from a different APK version if you ever need to.
 
-    python3 tools/extract_audio.py 09617-adventuretime-v1_0_8.apk audio
-
-then copy the resulting `audio` folder to `ux0:data/AdventureTimeVita/audio/` (so it contains
-`sfx_hit.wav`, `sfx_hammer.wav`, ...). Without it the game runs with music but no effects, and
-`log.txt` lists each missing file. The music needs no conversion.
+**Keep your GitHub repository private**: `audio/` contains the game's sound effects, which you may keep for
+your own use but shouldn't publish.
 
 Note: the game itself targets about 14 logic frames per second (it sleeps 70 ms per frame), so motion will
 look like the original phone version, not 60 fps.

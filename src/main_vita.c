@@ -30,6 +30,7 @@ static int quit_combo;
 void plat_sleep_ms(int ms) { sceKernelDelayThread((SceUInt32)ms * 1000u); }
 uint64_t plat_ms(void) { return sceKernelGetProcessTimeWide() / 1000; }
 const char *plat_data_dir(void) { return DATA_DIR; }
+const char *plat_app_dir(void) { return "app0:"; }
 void plat_quit(int code) { fflush(stderr); sceKernelExitProcess(code); }
 
 static void fb_alloc(void) {

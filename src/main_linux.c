@@ -28,6 +28,7 @@ void plat_sleep_ms(int ms) {
 }
 uint64_t plat_ms(void) { return vtime; }
 const char *plat_data_dir(void) { return "/tmp/atdata/"; }
+const char *plat_app_dir(void) { static char b[512]; const char *e = getenv("AVM_APPDIR"); snprintf(b, sizeof b, "%s%s", e ? e : "./", (e && e[0] && e[strlen(e) - 1] != '/') ? "/" : ""); return b; }
 void plat_quit(int code) { fprintf(stderr, "[plat] quit(%d) after %ld frames\n", code, frames); exit(code); }
 
 static void dump(const uint32_t *px, int w, int h, const char *name) {

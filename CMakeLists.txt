@@ -25,8 +25,16 @@ target_link_libraries(${PROJECT_NAME}
   SceDisplay_stub SceCtrl_stub SceTouch_stub ScePower_stub SceAudio_stub
 )
 
+# bundle the sound effects (audio/*.wav) inside the VPK; the app reads them from app0:audio/
+file(GLOB AUDIO_FILES RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/audio/*.wav)
+set(AUDIO_PAIRS "")
+foreach(f ${AUDIO_FILES})
+  list(APPEND AUDIO_PAIRS ${f} ${f})
+endforeach()
+
 vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
 vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
   VERSION ${VITA_VERSION}
   NAME ${VITA_APP_NAME}
+  FILE ${AUDIO_PAIRS}
 )

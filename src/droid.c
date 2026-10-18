@@ -385,9 +385,12 @@ static Asset *load_asset(uint32_t resid) {
     Asset *a = NULL; size_t n; const char *dot = strrchr(path, '.'), *sl = strrchr(path, '/'); const char *base = sl ? sl + 1 : path;
     if (dot && !strcmp(dot, ".mid")) { uint8_t *b = zip_extract(path, &n); if (b) { a = audio_load_midi(b, n); free(b); } }
     else {
-        char p[600]; int bl = (int)(dot ? dot - base : strlen(base)); snprintf(p, sizeof p, "%saudio/%.*s.wav", plat_data_dir(), bl, base);
-        char *b = slurp(p, &n); if (b) { a = audio_load_wav((uint8_t *)b, n); free(b); }
-        if (!a) fprintf(stderr, "[audio] no sound for %s (expected %s - run tools/extract_audio.py)\n", path, p);
+        char p[600]; int bl = (int)(dot ? dot - base : strlen(base));
+        /* bundled copy inside the VPK first, then the writable data folder */
+        snprintf(p, sizeof p, "%saudio/%.*s.wav", plat_app_dir(), bl, base);
+        char *b = slurp(p, &n); if (!b) { snprintf(p, sizeof p, "%saudio/%.*s.wav", plat_data_dir(), bl, base); b = slurp(p, &n); }
+        if (b) { a = audio_load_wav((uint8_t *)b, n); free(b); }
+        if (!a) fprintf(stderr, "[audio] no sound for %s (looked for audio/%.*s.wav)\n", path, bl, base);
     }
     if (nacache < 48) { acache[nacache].path = strdup(path); acache[nacache].a = a; nacache++; }
     return a;

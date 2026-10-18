@@ -10,6 +10,7 @@ void        plat_poll(void);                                    /* poll input, c
 void        plat_sleep_ms(int ms);
 uint64_t    plat_ms(void);
 const char *plat_data_dir(void);                                /* writable dir, trailing '/' */
+const char *plat_app_dir(void);                                 /* read-only dir with bundled assets (audio/), trailing '/' */
 void        plat_quit(int code);
 extern int  plat_log;                                           /* verbose Log.d / println */
 
