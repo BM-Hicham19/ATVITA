@@ -8,12 +8,21 @@ jobs:
     container: vitasdk/vitasdk:latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build
+      - name: Build (with icon + LiveArea artwork)
         run: |
           mkdir build && cd build
           cmake ..
           make
+      - name: Build fallback (no artwork)
+        run: |
+          mkdir build-noart && cd build-noart
+          cmake -DWITH_ARTWORK=OFF ..
+          make
       - uses: actions/upload-artifact@v4
         with:
-          name: AdventureTimeVita-vpk
+          name: AdventureTimeVita-with-artwork
           path: build/AdventureTimeVita.vpk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdventureTimeVita-no-artwork
+          path: build-noart/AdventureTimeVita.vpk
